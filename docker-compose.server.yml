@@ -1,0 +1,75 @@
+# Compose 1.29 on vetapp-prod (file format 2.4). Local Mac uses docker-compose.yml + override.
+version: "2.4"
+
+services:
+  db:
+    image: postgres:16.4-alpine
+    container_name: bitalep_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-bitalep}
+      POSTGRES_USER: ${POSTGRES_USER:-bitalep}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bitalep}
+    volumes:
+      - bitalep_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bitalep} -d ${POSTGRES_DB:-bitalep}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - bitalep_net
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: bitalep-api:1.0.0
+    container_name: bitalep_api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-bitalep}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-bitalep}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-bitalep}
+      PANEL_BASE_URL: https://panel.bitalep.com.tr
+      CORS_ORIGINS: https://panel.bitalep.com.tr
+    volumes:
+      - bitalep_files:/data/files
+    ports:
+      - "127.0.0.1:${API_HOST_PORT:-18080}:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      start_period: 90s
+      retries: 10
+    networks:
+      - bitalep_net
+
+  panel:
+    build:
+      context: ../BiTalep-frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_MODE: real
+        VITE_API_BASE_URL: https://api.bitalep.com.tr
+    image: bitalep-panel:1.0.0
+    container_name: bitalep_panel
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${PANEL_HOST_PORT:-18081}:80"
+    networks:
+      - bitalep_net
+
+volumes:
+  bitalep_pgdata:
+  bitalep_files:
+
+networks:
+  bitalep_net:
+    driver: bridge
