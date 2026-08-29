@@ -1,0 +1,26 @@
+# Production overlay. Copy to the server as docker-compose.override.yml
+# after SUB-B18 fills unique 127.0.0.1 ports. Never bind 80/443.
+services:
+  api:
+    ports:
+      - "127.0.0.1:${API_HOST_PORT:-18080}:8080"
+    environment:
+      PANEL_BASE_URL: https://panel.bitalep.com.tr
+      CORS_ORIGINS: https://panel.bitalep.com.tr
+      MAIL_HOST: ${MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_STARTTLS: ${MAIL_STARTTLS:-true}
+      MAIL_AUTH: ${MAIL_AUTH:-true}
+
+  mailpit:
+    profiles: ["local-mail"]
+
+  panel:
+    profiles: []
+    image: bitalep-panel:1.0.0
+    container_name: bitalep_panel
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${PANEL_HOST_PORT:-18081}:80"
+    networks:
+      - bitalep_net

@@ -1,0 +1,13 @@
+# Local developer overrides. Not used as-is on the production host.
+services:
+  api:
+    ports:
+      - "8080:8080"
+    depends_on:
+      mailpit:
+        condition: service_started
+
+  mailpit:
+    ports:
+      - "8025:8025"
+      - "1025:1025"
