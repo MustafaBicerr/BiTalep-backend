@@ -27,7 +27,9 @@ public final class FormDtos {
             Instant createdDate,
             Instant updatedDate,
             List<FileDtos.AttachmentResponse> attachments,
-            List<TimelineEntry> timeline
+            List<TimelineEntry> timeline,
+            String rejectReason,
+            String updateReason
     ) {}
 
     public record TimelineEntry(
@@ -50,4 +52,6 @@ public final class FormDtos {
     ) {}
 
     public record RejectRequest(@Size(max = 1000) String reason) {}
+
+    public record NeedsUpdateRequest(@Size(max = 1000) String reason) {}
 }

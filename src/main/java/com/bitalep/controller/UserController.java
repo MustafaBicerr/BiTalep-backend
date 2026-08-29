@@ -75,4 +75,12 @@ public class UserController {
     ) {
         return ApiSuccessResponse.of(userService.updateRole(id, req.role()));
     }
+
+    @PutMapping("/{id}/active")
+    public ApiSuccessResponse<UserDtos.UserResponse> setActive(
+            @PathVariable UUID id,
+            @RequestBody UserDtos.SetActiveRequest req
+    ) {
+        return ApiSuccessResponse.of(userService.setActive(id, req.active()));
+    }
 }

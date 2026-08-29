@@ -40,8 +40,13 @@ import java.util.UUID;
 public class FormService {
 
     private static final Map<RequestStatus, Set<RequestStatus>> TRANSITIONS = Map.of(
-            RequestStatus.NEW, Set.of(RequestStatus.IN_REVIEW, RequestStatus.CANCELLED),
-            RequestStatus.IN_REVIEW, Set.of(RequestStatus.APPROVED, RequestStatus.REJECTED, RequestStatus.CANCELLED),
+            RequestStatus.NEW, Set.of(RequestStatus.IN_REVIEW, RequestStatus.NEEDS_UPDATE, RequestStatus.CANCELLED),
+            RequestStatus.IN_REVIEW, Set.of(
+                    RequestStatus.APPROVED,
+                    RequestStatus.REJECTED,
+                    RequestStatus.NEEDS_UPDATE,
+                    RequestStatus.CANCELLED),
+            RequestStatus.NEEDS_UPDATE, Set.of(RequestStatus.IN_REVIEW, RequestStatus.CANCELLED),
             RequestStatus.APPROVED, Set.of(),
             RequestStatus.REJECTED, Set.of(),
             RequestStatus.CANCELLED, Set.of()
@@ -187,7 +192,20 @@ public class FormService {
         app.setDescription(req.description().trim());
         app.setFormType(req.formType());
         app.setUpdatedBy(TenantContext.userId());
+        boolean resubmit = !TenantContext.isAdmin() && app.getStatus() == RequestStatus.NEEDS_UPDATE;
+        if (resubmit) {
+            app.setStatus(RequestStatus.IN_REVIEW);
+            app.setUpdateReason(null);
+        }
         applications.save(app);
+        if (resubmit) {
+            addEvent(app, RequestStatus.IN_REVIEW, "Güncelleme tamamlandı, yeniden incelemeye alındı");
+            notifications.notifyAdmins(
+                    NotificationType.STATUS_CHANGE,
+                    "Talep yeniden incelemeye alındı",
+                    app.getTitle(),
+                    app.getId());
+        }
         return toDto(app, true, true);
     }
 
@@ -222,6 +240,26 @@ public class FormService {
         String desc = reason == null || reason.isBlank() ? "Reddedildi" : reason;
         addEvent(app, RequestStatus.REJECTED, desc);
         notifications.notifyUser(app.getApplicantId(), NotificationType.REJECTED, "Talep reddedildi", app.getTitle(), app.getId());
+        return toDto(app, true, true);
+    }
+
+    @Transactional
+    public FormDtos.ApplicationResponse needsUpdate(UUID id, String reason) {
+        Application app = loadVisible(id);
+        requireAdmin();
+        assertTransition(app.getStatus(), RequestStatus.NEEDS_UPDATE);
+        app.setUpdateReason(reason);
+        app.setStatus(RequestStatus.NEEDS_UPDATE);
+        app.setUpdatedBy(TenantContext.userId());
+        applications.save(app);
+        String desc = reason == null || reason.isBlank() ? "Güncelleme gerekiyor" : reason;
+        addEvent(app, RequestStatus.NEEDS_UPDATE, desc);
+        notifications.notifyUser(
+                app.getApplicantId(),
+                NotificationType.STATUS_CHANGE,
+                "Güncelleme gerekiyor",
+                app.getTitle(),
+                app.getId());
         return toDto(app, true, true);
     }
 
@@ -271,9 +309,13 @@ public class FormService {
         if (TenantContext.isAdmin()) {
             return;
         }
-        if (!app.getApplicantId().equals(TenantContext.userId()) || app.getStatus() != RequestStatus.NEW) {
+        if (!app.getApplicantId().equals(TenantContext.userId()) || !personnelMutable(app.getStatus())) {
             throw ApiException.forbidden();
         }
+    }
+
+    static boolean personnelMutable(RequestStatus status) {
+        return status == RequestStatus.NEW || status == RequestStatus.NEEDS_UPDATE;
     }
 
     private static void requireAdmin() {

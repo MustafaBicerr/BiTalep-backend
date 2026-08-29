@@ -68,7 +68,9 @@ public final class DtoMapper {
                 app.getCreatedAt(),
                 app.getUpdatedAt(),
                 attachments,
-                timeline
+                timeline,
+                app.getRejectReason(),
+                app.getUpdateReason()
         );
     }
 

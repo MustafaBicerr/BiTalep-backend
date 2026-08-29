@@ -9,6 +9,7 @@ import com.bitalep.entity.UserRole;
 import com.bitalep.exception.ApiException;
 import com.bitalep.mail.MailService;
 import com.bitalep.mapper.DtoMapper;
+import com.bitalep.repository.RefreshTokenRepository;
 import com.bitalep.repository.UserRepository;
 import com.bitalep.security.TenantContext;
 import com.bitalep.util.TokenHasher;
@@ -21,6 +22,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -29,12 +31,20 @@ import java.util.UUID;
 public class UserService {
 
     private final UserRepository users;
+    private final RefreshTokenRepository refreshTokens;
     private final PasswordEncoder passwordEncoder;
     private final MailService mailService;
     private final AppProperties props;
 
-    public UserService(UserRepository users, PasswordEncoder passwordEncoder, MailService mailService, AppProperties props) {
+    public UserService(
+            UserRepository users,
+            RefreshTokenRepository refreshTokens,
+            PasswordEncoder passwordEncoder,
+            MailService mailService,
+            AppProperties props
+    ) {
         this.users = users;
+        this.refreshTokens = refreshTokens;
         this.passwordEncoder = passwordEncoder;
         this.mailService = mailService;
         this.props = props;
@@ -70,6 +80,7 @@ public class UserService {
             List<Predicate> preds = new ArrayList<>();
             preds.add(cb.equal(root.get("tenantId"), tenantId));
             preds.add(cb.isNull(root.get("deletedAt")));
+            preds.add(cb.isTrue(root.get("active")));
             if (keyword != null && !keyword.isBlank()) {
                 String like = "%" + keyword.trim().toLowerCase() + "%";
                 preds.add(cb.or(
@@ -139,6 +150,25 @@ public class UserService {
         return DtoMapper.user(users.save(user));
     }
 
+    @Transactional
+    public UserDtos.UserResponse setActive(UUID id, Boolean active) {
+        requireAdmin();
+        if (active == null) {
+            throw ApiException.validation("errors:validation");
+        }
+        if (id.equals(TenantContext.userId()) && !active) {
+            throw ApiException.conflict();
+        }
+        AppUser user = load(id);
+        user.setActive(active);
+        user.setUpdatedBy(TenantContext.userId());
+        users.save(user);
+        if (!active) {
+            refreshTokens.revokeAllForUser(id, Instant.now());
+        }
+        return DtoMapper.user(user);
+    }
+
     private boolean demoSeedAllowed(String header) {
         String expected = props.demoSeedKey();
         return expected != null && !expected.isBlank() && expected.equals(header);
@@ -150,8 +180,12 @@ public class UserService {
     }
 
     private AppUser load(UUID id) {
-        return users.findByIdAndTenantIdAndDeletedAtIsNull(id, TenantContext.tenantId())
+        AppUser user = users.findByIdAndTenantIdAndDeletedAtIsNull(id, TenantContext.tenantId())
                 .orElseThrow(ApiException::notFound);
+        if (!user.isActive()) {
+            throw ApiException.notFound();
+        }
+        return user;
     }
 
     private static void requireAdmin() {

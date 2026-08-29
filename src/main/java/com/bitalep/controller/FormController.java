@@ -7,6 +7,7 @@ import com.bitalep.entity.Department;
 import com.bitalep.entity.FormType;
 import com.bitalep.entity.RequestStatus;
 import com.bitalep.service.impl.FormService;
+import com.bitalep.util.InstantQuery;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -43,8 +44,8 @@ public class FormController {
             @RequestParam(required = false) String sortOrder,
             @RequestParam(required = false) List<RequestStatus> status,
             @RequestParam(required = false) List<FormType> formType,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant dateFrom,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant dateTo,
+            @RequestParam(required = false) String dateFrom,
+            @RequestParam(required = false) String dateTo,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) UUID applicantId,
             @RequestParam(required = false) List<Department> department,
@@ -52,7 +53,8 @@ public class FormController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant updatedBefore
     ) {
         var result = formService.list(
-                page, pageSize, sortBy, sortOrder, status, formType, dateFrom, dateTo,
+                page, pageSize, sortBy, sortOrder, status, formType,
+                InstantQuery.start(dateFrom), InstantQuery.endInclusive(dateTo),
                 keyword, applicantId, department, hasAttachments, updatedBefore);
         return ApiSuccessResponse.page(result.data(), result.meta());
     }
@@ -101,6 +103,15 @@ public class FormController {
     ) {
         String reason = body == null ? null : body.reason();
         return ApiSuccessResponse.of(formService.reject(id, reason));
+    }
+
+    @PutMapping("/{id}/needs-update")
+    public ApiSuccessResponse<FormDtos.ApplicationResponse> needsUpdate(
+            @PathVariable UUID id,
+            @RequestBody(required = false) FormDtos.NeedsUpdateRequest body
+    ) {
+        String reason = body == null ? null : body.reason();
+        return ApiSuccessResponse.of(formService.needsUpdate(id, reason));
     }
 
     @GetMapping("/{id}/files")

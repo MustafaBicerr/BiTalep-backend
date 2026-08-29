@@ -83,7 +83,7 @@ public class AuthService {
             throw ApiException.conflict();
         }
         Tenant tenant = new Tenant();
-        tenant.setName(companyName(req));
+        tenant.setName(req.companyName().trim());
         tenant.setActive(true);
         tenants.save(tenant);
 
@@ -213,13 +213,6 @@ public class AuthService {
         t.setUpdatedBy(user.getId());
         t.setRaw(raw);
         return t;
-    }
-
-    private static String companyName(UserDtos.RegisterRequest req) {
-        if (req.companyName() != null && !req.companyName().isBlank()) {
-            return req.companyName().trim();
-        }
-        return (req.name() + " " + req.surname() + " Firması").trim();
     }
 
     static Instant nextPeriodEnd() {

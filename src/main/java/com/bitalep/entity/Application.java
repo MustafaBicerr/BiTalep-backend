@@ -38,4 +38,7 @@ public class Application extends SoftDeletableEntity {
 
     @Column(name = "reject_reason", length = 1000)
     private String rejectReason;
+
+    @Column(name = "update_reason", length = 1000)
+    private String updateReason;
 }

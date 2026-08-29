@@ -1,6 +1,7 @@
 package com.bitalep.security;
 
 import com.bitalep.entity.UserRole;
+import com.bitalep.repository.UserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -20,9 +21,11 @@ import java.util.List;
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
+    private final UserRepository users;
 
-    public JwtAuthFilter(JwtService jwtService) {
+    public JwtAuthFilter(JwtService jwtService, UserRepository users) {
         this.jwtService = jwtService;
+        this.users = users;
     }
 
     @Override
@@ -37,14 +40,19 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 String token = header.substring(7);
                 JwtService.AccessPrincipal principal = jwtService.parse(token);
                 if (principal != null) {
-                    TenantContext.set(principal.tenantId(), principal.userId(), principal.role());
-                    UserRole role = principal.role();
-                    var auth = new UsernamePasswordAuthenticationToken(
-                            principal.userId().toString(),
-                            null,
-                            List.of(new SimpleGrantedAuthority("ROLE_" + role.name()))
-                    );
-                    SecurityContextHolder.getContext().setAuthentication(auth);
+                    boolean active = users.findById(principal.userId())
+                            .filter(u -> u.isActive() && u.getDeletedAt() == null)
+                            .isPresent();
+                    if (active) {
+                        TenantContext.set(principal.tenantId(), principal.userId(), principal.role());
+                        UserRole role = principal.role();
+                        var auth = new UsernamePasswordAuthenticationToken(
+                                principal.userId().toString(),
+                                null,
+                                List.of(new SimpleGrantedAuthority("ROLE_" + role.name()))
+                        );
+                        SecurityContextHolder.getContext().setAuthentication(auth);
+                    }
                 }
             }
             filterChain.doFilter(request, response);

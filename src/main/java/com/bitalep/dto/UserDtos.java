@@ -34,7 +34,7 @@ public final class UserDtos {
             @NotBlank @Size(max = 100) String surname,
             @NotBlank @Email String email,
             @NotBlank @Size(min = 8, max = 128) String password,
-            @Size(max = 200) String companyName
+            @NotBlank @Size(max = 200) String companyName
     ) {}
 
     public record RefreshRequest(@NotBlank String refreshToken) {}
@@ -67,4 +67,6 @@ public final class UserDtos {
     ) {}
 
     public record UpdateRoleRequest(UserRole role) {}
+
+    public record SetActiveRequest(Boolean active) {}
 }

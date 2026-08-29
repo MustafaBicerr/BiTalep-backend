@@ -80,6 +80,9 @@ public class FileService {
         if (!TenantContext.isAdmin() && !app.getApplicantId().equals(TenantContext.userId())) {
             throw ApiException.notFound();
         }
+        if (!TenantContext.isAdmin() && !FormService.personnelMutable(app.getStatus())) {
+            throw ApiException.forbidden();
+        }
         UUID id = UUID.randomUUID();
         String original = safeName(file.getOriginalFilename());
         String storedName = id + "_" + original;
@@ -130,6 +133,13 @@ public class FileService {
     @Transactional
     public void delete(UUID id) {
         Attachment att = loadVisible(id);
+        if (!TenantContext.isAdmin()) {
+            Application app = applications.findByIdAndTenantIdAndDeletedAtIsNull(att.getApplicationId(), att.getTenantId())
+                    .orElseThrow(ApiException::notFound);
+            if (!FormService.personnelMutable(app.getStatus())) {
+                throw ApiException.forbidden();
+            }
+        }
         att.setDeletedAt(Instant.now());
         att.setUpdatedBy(TenantContext.userId());
         attachments.save(att);

@@ -37,7 +37,10 @@ public class DashboardService {
         Instant overdueCut = now.minus(3, ChronoUnit.DAYS);
 
         long total = items.size();
-        long pending = items.stream().filter(a -> a.getStatus() == RequestStatus.NEW || a.getStatus() == RequestStatus.IN_REVIEW).count();
+        long pending = items.stream().filter(a ->
+                a.getStatus() == RequestStatus.NEW
+                        || a.getStatus() == RequestStatus.IN_REVIEW
+                        || a.getStatus() == RequestStatus.NEEDS_UPDATE).count();
         long approved = items.stream().filter(a -> a.getStatus() == RequestStatus.APPROVED).count();
         long rejected = items.stream().filter(a -> a.getStatus() == RequestStatus.REJECTED).count();
         long today = items.stream().filter(a -> !a.getCreatedAt().isBefore(todayStart)).count();
